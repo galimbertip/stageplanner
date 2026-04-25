@@ -4,20 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#8b5cf6">
-    <title>Stage Planner</title>
+    <title>Stage Planner - Cloud</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
             --primary: #8b5cf6; --bg: #0f0f0f; --bg-secondary: #1a1a1a;
             --bg-tertiary: #262626; --text: #f5f5f5; --text-secondary: #a3a3a3;
-            --border: #404040; --success: #10b981; --danger: #ef4444;
+            --border: #404040; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
         .app-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-        header { background: var(--bg-secondary); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border); }
+        header { background: var(--bg-secondary); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border); position: relative; }
         h1 { font-size: 24px; margin-bottom: 8px; color: var(--primary); }
         .subtitle { color: var(--text-secondary); font-size: 14px; }
+        .sync-status { position: absolute; top: 20px; right: 20px; padding: 6px 12px; border-radius: 20px; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+        .sync-status.online { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .sync-status.offline { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .sync-status.syncing { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
         .main-content { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
         @media (max-width: 968px) { .main-content { grid-template-columns: 1fr; } }
         .sidebar { background: var(--bg-secondary); padding: 20px; border-radius: 12px; border: 1px solid var(--border); height: fit-content; }
@@ -67,7 +76,11 @@
     <div class="app-container">
         <header>
             <h1>🎭 Stage Planner</h1>
-            <p class="subtitle">Gestione planimetrie teatrali e oggetti di scena</p>
+            <p class="subtitle">Gestione planimetrie teatrali - Sincronizzazione Cloud</p>
+            <div class="sync-status offline" id="syncStatus">
+                <span id="syncIcon">●</span>
+                <span id="syncText">Caricamento...</span>
+            </div>
         </header>
         <div class="main-content">
             <div class="sidebar">
@@ -83,7 +96,7 @@
             <div class="editor-area" id="editorArea">
                 <div class="empty-state">
                     <h2>👈 Inizia creando un nuovo progetto</h2>
-                    <p>Crea un progetto per lo spettacolo e aggiungi le planimetrie delle scene</p>
+                    <p>I tuoi progetti saranno sincronizzati su tutti i dispositivi</p>
                 </div>
             </div>
         </div>
@@ -123,7 +136,518 @@
         </div>
     </div>
     <script>
-        const app={state:{projects:[],currentProject:null,currentScene:null,tool:'select',color:'#000000',drawing:!1,startX:0,startY:0},canvas:null,ctx:null,init(){this.loadProjects();this.renderProjects()},loadProjects(){const t=localStorage.getItem('stagePlannerProjects');t&&(this.state.projects=JSON.parse(t))},saveProjects(){localStorage.setItem('stagePlannerProjects',JSON.stringify(this.state.projects))},openNewProjectModal(){document.getElementById('newProjectModal').classList.add('active');document.getElementById('projectName').value='';document.getElementById('projectDesc').value='';document.getElementById('projectName').focus()},createProject(){const t=document.getElementById('projectName').value.trim();if(!t)return void alert('Inserisci il nome dello spettacolo');const e={id:Date.now(),name:t,description:document.getElementById('projectDesc').value.trim(),created:(new Date).toISOString(),scenes:[]};this.state.projects.push(e);this.saveProjects();this.renderProjects();this.closeModal('newProjectModal');this.selectProject(e.id)},selectProject(t){this.state.currentProject=this.state.projects.find(e=>e.id===t);this.state.currentScene=null;this.renderProjects();this.renderScenes();this.showEditor()},deleteProject(t,e){e.stopPropagation();if(!confirm('Eliminare questo progetto e tutte le sue scene?'))return;this.state.projects=this.state.projects.filter(e=>e.id!==t);this.state.currentProject?.id===t&&(this.state.currentProject=null,this.state.currentScene=null);this.saveProjects();this.renderProjects();this.state.currentProject||this.hideEditor()},renderProjects(){const t=document.getElementById('projectList');0===this.state.projects.length?t.innerHTML='<p style="color: var(--text-secondary); font-size: 14px; margin-top: 12px;">Nessun progetto</p>':t.innerHTML=this.state.projects.map(t=>`<div class="project-item ${this.state.currentProject?.id===t.id?'active':''}" onclick="app.selectProject(${t.id})"><div class="project-name">${t.name}</div><div class="project-meta">${t.scenes.length} scene · ${new Date(t.created).toLocaleDateString('it-IT')}</div><button class="btn btn-danger delete-btn" onclick="app.deleteProject(${t.id}, event)">🗑️</button></div>`).join('')},openNewSceneModal(){if(!this.state.currentProject)return void alert('Seleziona prima un progetto');document.getElementById('newSceneModal').classList.add('active');document.getElementById('sceneNumber').value='';document.getElementById('sceneName').value='';document.getElementById('sceneNumber').focus()},createScene(){const t=document.getElementById('sceneNumber').value.trim(),e=document.getElementById('sceneName').value.trim();if(!t)return void alert('Inserisci il numero della scena');const s={id:Date.now(),number:t,name:e,created:(new Date).toISOString(),canvasData:null};this.state.currentProject.scenes.push(s);this.saveProjects();this.renderScenes();this.closeModal('newSceneModal');this.selectScene(s.id)},selectScene(t){this.state.currentScene=this.state.currentProject.scenes.find(e=>e.id===t);this.renderScenes();this.showEditor()},deleteScene(t,e){e.stopPropagation();if(!confirm('Eliminare questa scena?'))return;this.state.currentProject.scenes=this.state.currentProject.scenes.filter(e=>e.id!==t);this.state.currentScene?.id===t&&(this.state.currentScene=null);this.saveProjects();this.renderScenes();!this.state.currentScene&&this.state.currentProject.scenes.length>0?this.selectScene(this.state.currentProject.scenes[0].id):this.showEditor()},renderScenes(){const t=document.getElementById('sceneSection'),e=document.getElementById('sceneList');if(!this.state.currentProject)return void(t.style.display='none');t.style.display='block';0===this.state.currentProject.scenes.length?e.innerHTML='<p style="color: var(--text-secondary); font-size: 14px; margin-top: 12px;">Nessuna scena</p>':e.innerHTML=this.state.currentProject.scenes.map(t=>`<div class="scene-item ${this.state.currentScene?.id===t.id?'active':''}" onclick="app.selectScene(${t.id})"><div class="project-name">Scena ${t.number}</div><div class="scene-meta">${t.name||'Senza nome'}</div><button class="btn btn-danger delete-btn" onclick="app.deleteScene(${t.id}, event)">🗑️</button></div>`).join('')},showEditor(){const t=document.getElementById('editorArea');if(!this.state.currentProject)return;if(!this.state.currentScene)return void(t.innerHTML=`<div class="empty-state"><h2>${this.state.currentProject.name}</h2><p>${this.state.currentProject.description||''}</p><p style="margin-top: 20px;">Crea una scena per iniziare a disegnare la planimetria</p></div>`);const e=this.getObjectLibrary();t.innerHTML=`<div style="margin-bottom: 16px;"><h2 style="font-size: 20px; margin-bottom: 4px;">${this.state.currentProject.name}</h2><p style="color: var(--text-secondary); font-size: 14px;">${this.state.currentProject.description||'Nessuna descrizione'}</p></div><div class="toolbar"><button class="tool-btn ${'select'===this.state.tool?'active':''}" onclick="app.setTool('select')">👆 Seleziona</button><button class="tool-btn ${'rectangle'===this.state.tool?'active':''}" onclick="app.setTool('rectangle')">⬜ Rettangolo</button><button class="tool-btn ${'circle'===this.state.tool?'active':''}" onclick="app.setTool('circle')">⭕ Cerchio</button><button class="tool-btn ${'line'===this.state.tool?'active':''}" onclick="app.setTool('line')">📏 Linea</button><button class="tool-btn ${'text'===this.state.tool?'active':''}" onclick="app.setTool('text')">📝 Testo</button><input type="color" class="color-picker" value="${this.state.color}" onchange="app.state.color = this.value"><button class="tool-btn" onclick="app.clearCanvas()">🗑️ Pulisci</button><button class="btn btn-success" onclick="app.exportToPDF()">📄 Esporta PDF</button></div><div class="scene-info"><strong>Scena ${this.state.currentScene.number}</strong> - ${this.state.currentScene.name||'Senza nome'}</div><div class="section-title">Libreria Oggetti di Scena</div><div class="object-library">${e.map(t=>`<div class="object-item" onclick="app.addObjectToCanvas('${t.emoji}', '${t.label}')"><div>${t.emoji}</div><div class="object-label">${t.label}</div></div>`).join('')}</div><div class="canvas-container"><canvas id="stage-canvas" width="800" height="600"></canvas></div>`;setTimeout(()=>this.initCanvas(),100)},hideEditor(){document.getElementById('editorArea').innerHTML='<div class="empty-state"><h2>👈 Inizia creando un nuovo progetto</h2><p>Crea un progetto per lo spettacolo e aggiungi le planimetrie delle scene</p></div>'},getObjectLibrary(){return[{emoji:'🪑',label:'Sedia'},{emoji:'🛋️',label:'Divano'},{emoji:'🛏️',label:'Letto'},{emoji:'🚪',label:'Porta'},{emoji:'🪟',label:'Finestra'},{emoji:'🕯️',label:'Candela'},{emoji:'💡',label:'Luce'},{emoji:'🎭',label:'Attore'},{emoji:'👤',label:'Persona'},{emoji:'🌳',label:'Albero'},{emoji:'📚',label:'Libri'},{emoji:'🎨',label:'Quadro'}]},initCanvas(){if(this.canvas=document.getElementById('stage-canvas'),!this.canvas)return;this.ctx=this.canvas.getContext('2d');const t=this.canvas.parentElement.getBoundingClientRect();this.canvas.width=Math.min(800,t.width-40);this.canvas.height=600;this.drawGrid();this.loadCanvasData();this.canvas.addEventListener('mousedown',t=>this.handleMouseDown(t));this.canvas.addEventListener('mousemove',t=>this.handleMouseMove(t));this.canvas.addEventListener('mouseup',t=>this.handleMouseUp(t));this.canvas.addEventListener('touchstart',t=>this.handleTouchStart(t));this.canvas.addEventListener('touchmove',t=>this.handleTouchMove(t));this.canvas.addEventListener('touchend',t=>this.handleTouchEnd(t))},drawGrid(){this.ctx.strokeStyle='#e0e0e0';this.ctx.lineWidth=.5;for(let t=0;t<this.canvas.width;t+=20)this.ctx.beginPath(),this.ctx.moveTo(t,0),this.ctx.lineTo(t,this.canvas.height),this.ctx.stroke();for(let t=0;t<this.canvas.height;t+=20)this.ctx.beginPath(),this.ctx.moveTo(0,t),this.ctx.lineTo(this.canvas.width,t),this.ctx.stroke()},setTool(t){this.state.tool=t;this.showEditor()},clearCanvas(){confirm('Pulire la planimetria?')&&(this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height),this.drawGrid(),this.saveCanvasData())},handleMouseDown(t){if('select'!==this.state.tool&&(this.state.drawing=!0,this.state.startX=t.clientX-this.canvas.getBoundingClientRect().left,this.state.startY=t.clientY-this.canvas.getBoundingClientRect().top,'text'===this.state.tool)){const t=prompt('Inserisci il testo:');t&&(this.ctx.fillStyle=this.state.color,this.ctx.font='16px Arial',this.ctx.fillText(t,this.state.startX,this.state.startY),this.saveCanvasData());this.state.drawing=!1}},handleMouseMove(t){if(!this.state.drawing||'select'===this.state.tool||'text'===this.state.tool)return;const e=t.clientX-this.canvas.getBoundingClientRect().left,s=t.clientY-this.canvas.getBoundingClientRect().top;if(this.loadCanvasData(),this.ctx.strokeStyle=this.state.color,this.ctx.fillStyle=this.state.color,this.ctx.lineWidth=2,'rectangle'===this.state.tool)this.ctx.strokeRect(this.state.startX,this.state.startY,e-this.state.startX,s-this.state.startY);else if('circle'===this.state.tool){const t=Math.sqrt(Math.pow(e-this.state.startX,2)+Math.pow(s-this.state.startY,2));this.ctx.beginPath();this.ctx.arc(this.state.startX,this.state.startY,t,0,2*Math.PI);this.ctx.stroke()}else'line'===this.state.tool&&(this.ctx.beginPath(),this.ctx.moveTo(this.state.startX,this.state.startY),this.ctx.lineTo(e,s),this.ctx.stroke())},handleMouseUp(t){this.state.drawing&&'select'!==this.state.tool&&'text'!==this.state.tool&&this.saveCanvasData();this.state.drawing=!1},handleTouchStart(t){t.preventDefault();const e=t.touches[0];this.canvas.dispatchEvent(new MouseEvent('mousedown',{clientX:e.clientX,clientY:e.clientY}))},handleTouchMove(t){t.preventDefault();const e=t.touches[0];this.canvas.dispatchEvent(new MouseEvent('mousemove',{clientX:e.clientX,clientY:e.clientY}))},handleTouchEnd(t){t.preventDefault();this.canvas.dispatchEvent(new MouseEvent('mouseup',{}))},addObjectToCanvas(t,e){if(!this.canvas)return;const s=this.canvas.width/2,i=this.canvas.height/2;this.ctx.font='40px Arial';this.ctx.fillText(t,s,i);this.ctx.font='12px Arial';this.ctx.fillStyle='#000';this.ctx.fillText(e,s,i+30);this.saveCanvasData()},saveCanvasData(){this.state.currentScene&&(this.state.currentScene.canvasData=this.canvas.toDataURL(),this.saveProjects())},loadCanvasData(){if(!this.state.currentScene||!this.state.currentScene.canvasData)return this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height),void this.drawGrid();const t=new Image;t.onload=()=>{this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);this.ctx.drawImage(t,0,0)};t.src=this.state.currentScene.canvasData},async exportToPDF(){if(!this.state.currentProject)return;const{jsPDF:t}=window.jspdf,e=new t('landscape');let s=20;e.setFontSize(24);e.text(this.state.currentProject.name,20,s);s+=10;e.setFontSize(12);this.state.currentProject.description&&(e.text(this.state.currentProject.description,20,s),s+=10);e.text(`Data: ${new Date().toLocaleDateString('it-IT')}`,20,s);e.text(`Scene totali: ${this.state.currentProject.scenes.length}`,20,s+7);for(let t=0;t<this.state.currentProject.scenes.length;t++){const s=this.state.currentProject.scenes[t];e.addPage();e.setFontSize(18);e.text(`Scena ${s.number}`,20,20);e.setFontSize(12);s.name&&e.text(s.name,20,30);s.canvasData&&e.addImage(s.canvasData,'PNG',20,40,240,180)}e.save(`${this.state.currentProject.name}_planimetrie.pdf`)},closeModal(t){document.getElementById(t).classList.remove('active')}};app.init();
+        // ✅ CONFIGURAZIONE FIREBASE - LE TUE CREDENZIALI
+        const firebaseConfig = {
+            apiKey: "AIzaSyAU_0mh7dAUKOsqH9OjczzWePDBvaJqfLU",
+            authDomain: "stageplanner-4149f.firebaseapp.com",
+            projectId: "stageplanner-4149f",
+            storageBucket: "stageplanner-4149f.firebasestorage.app",
+            messagingSenderId: "896447941939",
+            appId: "1:896447941939:web:aebc95147874c8bc070246"
+        };
+
+        // Inizializza Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // APP PRINCIPALE
+        const app = {
+            state: {
+                projects: [],
+                currentProject: null,
+                currentScene: null,
+                tool: 'select',
+                color: '#000000',
+                drawing: false,
+                startX: 0,
+                startY: 0
+            },
+            canvas: null,
+            ctx: null,
+
+            init() {
+                this.setupRealtimeSync();
+            },
+
+            updateSyncStatus(status) {
+                const statusEl = document.getElementById('syncStatus');
+                const iconEl = document.getElementById('syncIcon');
+                const textEl = document.getElementById('syncText');
+                
+                statusEl.className = 'sync-status ' + status;
+                
+                if (status === 'online') {
+                    iconEl.textContent = '●';
+                    textEl.textContent = 'Sincronizzato';
+                } else if (status === 'syncing') {
+                    iconEl.textContent = '↻';
+                    textEl.textContent = 'Sincronizzazione...';
+                } else {
+                    iconEl.textContent = '●';
+                    textEl.textContent = 'Offline';
+                }
+            },
+
+            setupRealtimeSync() {
+                db.collection('projects').onSnapshot((snapshot) => {
+                    this.state.projects = [];
+                    snapshot.forEach((doc) => {
+                        this.state.projects.push({
+                            firebaseId: doc.id,
+                            ...doc.data()
+                        });
+                    });
+                    this.renderProjects();
+                    this.updateSyncStatus('online');
+                }, (error) => {
+                    console.error('Errore sincronizzazione:', error);
+                    this.updateSyncStatus('offline');
+                    alert('Errore connessione Firebase. Verifica le credenziali e le regole Firestore.');
+                });
+            },
+
+            async saveProjectToFirebase(project) {
+                this.updateSyncStatus('syncing');
+                try {
+                    if (project.firebaseId) {
+                        await db.collection('projects').doc(project.firebaseId).update(project);
+                    } else {
+                        const docRef = await db.collection('projects').add(project);
+                        project.firebaseId = docRef.id;
+                    }
+                    this.updateSyncStatus('online');
+                } catch (error) {
+                    console.error('Errore salvataggio:', error);
+                    this.updateSyncStatus('offline');
+                    alert('Errore durante il salvataggio: ' + error.message);
+                }
+            },
+
+            async deleteProjectFromFirebase(firebaseId) {
+                this.updateSyncStatus('syncing');
+                try {
+                    await db.collection('projects').doc(firebaseId).delete();
+                    this.updateSyncStatus('online');
+                } catch (error) {
+                    console.error('Errore eliminazione:', error);
+                    this.updateSyncStatus('offline');
+                }
+            },
+
+            openNewProjectModal() {
+                document.getElementById('newProjectModal').classList.add('active');
+                document.getElementById('projectName').value = '';
+                document.getElementById('projectDesc').value = '';
+                document.getElementById('projectName').focus();
+            },
+
+            async createProject() {
+                const name = document.getElementById('projectName').value.trim();
+                if (!name) {
+                    alert('Inserisci il nome dello spettacolo');
+                    return;
+                }
+
+                const project = {
+                    id: Date.now(),
+                    name: name,
+                    description: document.getElementById('projectDesc').value.trim(),
+                    created: new Date().toISOString(),
+                    scenes: []
+                };
+
+                await this.saveProjectToFirebase(project);
+                this.closeModal('newProjectModal');
+                this.selectProject(project.id);
+            },
+
+            selectProject(projectId) {
+                this.state.currentProject = this.state.projects.find(p => p.id === projectId);
+                this.state.currentScene = null;
+                this.renderProjects();
+                this.renderScenes();
+                this.showEditor();
+            },
+
+            async deleteProject(projectId, firebaseId, event) {
+                event.stopPropagation();
+                if (!confirm('Eliminare questo progetto e tutte le sue scene?')) return;
+                
+                await this.deleteProjectFromFirebase(firebaseId);
+                
+                if (this.state.currentProject?.id === projectId) {
+                    this.state.currentProject = null;
+                    this.state.currentScene = null;
+                    this.hideEditor();
+                }
+            },
+
+            renderProjects() {
+                const list = document.getElementById('projectList');
+                if (this.state.projects.length === 0) {
+                    list.innerHTML = '<p style="color: var(--text-secondary); font-size: 14px; margin-top: 12px;">Nessun progetto</p>';
+                    return;
+                }
+
+                list.innerHTML = this.state.projects.map(p => `
+                    <div class="project-item ${this.state.currentProject?.id === p.id ? 'active' : ''}" 
+                         onclick="app.selectProject(${p.id})">
+                        <div class="project-name">${p.name}</div>
+                        <div class="project-meta">${p.scenes.length} scene · ${new Date(p.created).toLocaleDateString('it-IT')}</div>
+                        <button class="btn btn-danger delete-btn" onclick="app.deleteProject(${p.id}, '${p.firebaseId}', event)">🗑️</button>
+                    </div>
+                `).join('');
+            },
+
+            openNewSceneModal() {
+                if (!this.state.currentProject) {
+                    alert('Seleziona prima un progetto');
+                    return;
+                }
+                document.getElementById('newSceneModal').classList.add('active');
+                document.getElementById('sceneNumber').value = '';
+                document.getElementById('sceneName').value = '';
+                document.getElementById('sceneNumber').focus();
+            },
+
+            async createScene() {
+                const number = document.getElementById('sceneNumber').value.trim();
+                const name = document.getElementById('sceneName').value.trim();
+                
+                if (!number) {
+                    alert('Inserisci il numero della scena');
+                    return;
+                }
+
+                const scene = {
+                    id: Date.now(),
+                    number: number,
+                    name: name,
+                    created: new Date().toISOString(),
+                    canvasData: null
+                };
+
+                this.state.currentProject.scenes.push(scene);
+                await this.saveProjectToFirebase(this.state.currentProject);
+                this.renderScenes();
+                this.closeModal('newSceneModal');
+                this.selectScene(scene.id);
+            },
+
+            selectScene(sceneId) {
+                this.state.currentScene = this.state.currentProject.scenes.find(s => s.id === sceneId);
+                this.renderScenes();
+                this.showEditor();
+            },
+
+            async deleteScene(sceneId, event) {
+                event.stopPropagation();
+                if (!confirm('Eliminare questa scena?')) return;
+                
+                this.state.currentProject.scenes = this.state.currentProject.scenes.filter(s => s.id !== sceneId);
+                await this.saveProjectToFirebase(this.state.currentProject);
+                
+                if (this.state.currentScene?.id === sceneId) {
+                    this.state.currentScene = null;
+                }
+                this.renderScenes();
+                
+                if (!this.state.currentScene && this.state.currentProject.scenes.length > 0) {
+                    this.selectScene(this.state.currentProject.scenes[0].id);
+                } else {
+                    this.showEditor();
+                }
+            },
+
+            renderScenes() {
+                const section = document.getElementById('sceneSection');
+                const list = document.getElementById('sceneList');
+                
+                if (!this.state.currentProject) {
+                    section.style.display = 'none';
+                    return;
+                }
+
+                section.style.display = 'block';
+
+                if (this.state.currentProject.scenes.length === 0) {
+                    list.innerHTML = '<p style="color: var(--text-secondary); font-size: 14px; margin-top: 12px;">Nessuna scena</p>';
+                    return;
+                }
+
+                list.innerHTML = this.state.currentProject.scenes.map(s => `
+                    <div class="scene-item ${this.state.currentScene?.id === s.id ? 'active' : ''}" 
+                         onclick="app.selectScene(${s.id})">
+                        <div class="project-name">Scena ${s.number}</div>
+                        <div class="scene-meta">${s.name || 'Senza nome'}</div>
+                        <button class="btn btn-danger delete-btn" onclick="app.deleteScene(${s.id}, event)">🗑️</button>
+                    </div>
+                `).join('');
+            },
+
+            showEditor() {
+                const editor = document.getElementById('editorArea');
+                if (!this.state.currentProject) return;
+
+                if (!this.state.currentScene) {
+                    editor.innerHTML = `
+                        <div class="empty-state">
+                            <h2>${this.state.currentProject.name}</h2>
+                            <p>${this.state.currentProject.description || ''}</p>
+                            <p style="margin-top: 20px;">Crea una scena per iniziare a disegnare la planimetria</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const objects = this.getObjectLibrary();
+                
+                editor.innerHTML = `
+                    <div style="margin-bottom: 16px;">
+                        <h2 style="font-size: 20px; margin-bottom: 4px;">${this.state.currentProject.name}</h2>
+                        <p style="color: var(--text-secondary); font-size: 14px;">${this.state.currentProject.description || 'Nessuna descrizione'}</p>
+                    </div>
+
+                    <div class="toolbar">
+                        <button class="tool-btn ${'select' === this.state.tool ? 'active' : ''}" onclick="app.setTool('select')">👆 Seleziona</button>
+                        <button class="tool-btn ${'rectangle' === this.state.tool ? 'active' : ''}" onclick="app.setTool('rectangle')">⬜ Rettangolo</button>
+                        <button class="tool-btn ${'circle' === this.state.tool ? 'active' : ''}" onclick="app.setTool('circle')">⭕ Cerchio</button>
+                        <button class="tool-btn ${'line' === this.state.tool ? 'active' : ''}" onclick="app.setTool('line')">📏 Linea</button>
+                        <button class="tool-btn ${'text' === this.state.tool ? 'active' : ''}" onclick="app.setTool('text')">📝 Testo</button>
+                        <input type="color" class="color-picker" value="${this.state.color}" onchange="app.state.color = this.value">
+                        <button class="tool-btn" onclick="app.clearCanvas()">🗑️ Pulisci</button>
+                        <button class="btn btn-success" onclick="app.exportToPDF()">📄 Esporta PDF</button>
+                    </div>
+
+                    <div class="scene-info">
+                        <strong>Scena ${this.state.currentScene.number}</strong> - ${this.state.currentScene.name || 'Senza nome'}
+                    </div>
+
+                    <div class="section-title">Libreria Oggetti di Scena</div>
+                    <div class="object-library">
+                        ${objects.map(obj => `
+                            <div class="object-item" onclick="app.addObjectToCanvas('${obj.emoji}', '${obj.label}')">
+                                <div>${obj.emoji}</div>
+                                <div class="object-label">${obj.label}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div class="canvas-container">
+                        <canvas id="stage-canvas" width="800" height="600"></canvas>
+                    </div>
+                `;
+
+                setTimeout(() => this.initCanvas(), 100);
+            },
+
+            hideEditor() {
+                document.getElementById('editorArea').innerHTML = `
+                    <div class="empty-state">
+                        <h2>👈 Inizia creando un nuovo progetto</h2>
+                        <p>I tuoi progetti saranno sincronizzati su tutti i dispositivi</p>
+                    </div>
+                `;
+            },
+
+            getObjectLibrary() {
+                return [
+                    { emoji: '🪑', label: 'Sedia' }, { emoji: '🛋️', label: 'Divano' },
+                    { emoji: '🛏️', label: 'Letto' }, { emoji: '🚪', label: 'Porta' },
+                    { emoji: '🪟', label: 'Finestra' }, { emoji: '🕯️', label: 'Candela' },
+                    { emoji: '💡', label: 'Luce' }, { emoji: '🎭', label: 'Attore' },
+                    { emoji: '👤', label: 'Persona' }, { emoji: '🌳', label: 'Albero' },
+                    { emoji: '📚', label: 'Libri' }, { emoji: '🎨', label: 'Quadro' }
+                ];
+            },
+
+            initCanvas() {
+                this.canvas = document.getElementById('stage-canvas');
+                if (!this.canvas) return;
+                this.ctx = this.canvas.getContext('2d');
+                const rect = this.canvas.parentElement.getBoundingClientRect();
+                this.canvas.width = Math.min(800, rect.width - 40);
+                this.canvas.height = 600;
+                this.drawGrid();
+                this.loadCanvasData();
+                this.canvas.addEventListener('mousedown', e => this.handleMouseDown(e));
+                this.canvas.addEventListener('mousemove', e => this.handleMouseMove(e));
+                this.canvas.addEventListener('mouseup', e => this.handleMouseUp(e));
+                this.canvas.addEventListener('touchstart', e => this.handleTouchStart(e));
+                this.canvas.addEventListener('touchmove', e => this.handleTouchMove(e));
+                this.canvas.addEventListener('touchend', e => this.handleTouchEnd(e));
+            },
+
+            drawGrid() {
+                this.ctx.strokeStyle = '#e0e0e0';
+                this.ctx.lineWidth = 0.5;
+                for (let x = 0; x < this.canvas.width; x += 20) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.canvas.height);
+                    this.ctx.stroke();
+                }
+                for (let y = 0; y < this.canvas.height; y += 20) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.canvas.width, y);
+                    this.ctx.stroke();
+                }
+            },
+
+            setTool(tool) {
+                this.state.tool = tool;
+                this.showEditor();
+            },
+
+            async clearCanvas() {
+                if (!confirm('Pulire la planimetria?')) return;
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.drawGrid();
+                await this.saveCanvasData();
+            },
+
+            handleMouseDown(e) {
+                if (this.state.tool === 'select') return;
+                this.state.drawing = true;
+                const rect = this.canvas.getBoundingClientRect();
+                this.state.startX = e.clientX - rect.left;
+                this.state.startY = e.clientY - rect.top;
+                if (this.state.tool === 'text') {
+                    const text = prompt('Inserisci il testo:');
+                    if (text) {
+                        this.ctx.fillStyle = this.state.color;
+                        this.ctx.font = '16px Arial';
+                        this.ctx.fillText(text, this.state.startX, this.state.startY);
+                        this.saveCanvasData();
+                    }
+                    this.state.drawing = false;
+                }
+            },
+
+            handleMouseMove(e) {
+                if (!this.state.drawing || this.state.tool === 'select' || this.state.tool === 'text') return;
+                const rect = this.canvas.getBoundingClientRect();
+                const currentX = e.clientX - rect.left;
+                const currentY = e.clientY - rect.top;
+                this.loadCanvasData();
+                this.ctx.strokeStyle = this.state.color;
+                this.ctx.fillStyle = this.state.color;
+                this.ctx.lineWidth = 2;
+                if (this.state.tool === 'rectangle') {
+                    this.ctx.strokeRect(this.state.startX, this.state.startY, currentX - this.state.startX, currentY - this.state.startY);
+                } else if (this.state.tool === 'circle') {
+                    const radius = Math.sqrt(Math.pow(currentX - this.state.startX, 2) + Math.pow(currentY - this.state.startY, 2));
+                    this.ctx.beginPath();
+                    this.ctx.arc(this.state.startX, this.state.startY, radius, 0, 2 * Math.PI);
+                    this.ctx.stroke();
+                } else if (this.state.tool === 'line') {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.state.startX, this.state.startY);
+                    this.ctx.lineTo(currentX, currentY);
+                    this.ctx.stroke();
+                }
+            },
+
+            async handleMouseUp(e) {
+                if (this.state.drawing && this.state.tool !== 'select' && this.state.tool !== 'text') {
+                    await this.saveCanvasData();
+                }
+                this.state.drawing = false;
+            },
+
+            handleTouchStart(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                this.canvas.dispatchEvent(new MouseEvent('mousedown', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                }));
+            },
+
+            handleTouchMove(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                this.canvas.dispatchEvent(new MouseEvent('mousemove', {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                }));
+            },
+
+            handleTouchEnd(e) {
+                e.preventDefault();
+                this.canvas.dispatchEvent(new MouseEvent('mouseup', {}));
+            },
+
+            async addObjectToCanvas(emoji, label) {
+                if (!this.canvas) return;
+                const x = this.canvas.width / 2;
+                const y = this.canvas.height / 2;
+                this.ctx.font = '40px Arial';
+                this.ctx.fillText(emoji, x, y);
+                this.ctx.font = '12px Arial';
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillText(label, x, y + 30);
+                await this.saveCanvasData();
+            },
+
+            async saveCanvasData() {
+                if (!this.state.currentScene) return;
+                this.state.currentScene.canvasData = this.canvas.toDataURL();
+                await this.saveProjectToFirebase(this.state.currentProject);
+            },
+
+            loadCanvasData() {
+                if (!this.state.currentScene || !this.state.currentScene.canvasData) {
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                    this.drawGrid();
+                    return;
+                }
+                const img = new Image();
+                img.onload = () => {
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                    this.ctx.drawImage(img, 0, 0);
+                };
+                img.src = this.state.currentScene.canvasData;
+            },
+
+            async exportToPDF() {
+                if (!this.state.currentProject) return;
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('landscape');
+                let yPos = 20;
+                pdf.setFontSize(24);
+                pdf.text(this.state.currentProject.name, 20, yPos);
+                yPos += 10;
+                pdf.setFontSize(12);
+                if (this.state.currentProject.description) {
+                    pdf.text(this.state.currentProject.description, 20, yPos);
+                    yPos += 10;
+                }
+                pdf.text(`Data: ${new Date().toLocaleDateString('it-IT')}`, 20, yPos);
+                pdf.text(`Scene totali: ${this.state.currentProject.scenes.length}`, 20, yPos + 7);
+                for (let i = 0; i < this.state.currentProject.scenes.length; i++) {
+                    const scene = this.state.currentProject.scenes[i];
+                    pdf.addPage();
+                    pdf.setFontSize(18);
+                    pdf.text(`Scena ${scene.number}`, 20, 20);
+                    pdf.setFontSize(12);
+                    if (scene.name) {
+                        pdf.text(scene.name, 20, 30);
+                    }
+                    if (scene.canvasData) {
+                        pdf.addImage(scene.canvasData, 'PNG', 20, 40, 240, 180);
+                    }
+                }
+                pdf.save(`${this.state.currentProject.name}_planimetrie.pdf`);
+            },
+
+            closeModal(id) {
+                document.getElementById(id).classList.remove('active');
+            }
+        };
+
+        app.init();
     </script>
 </body>
 </html>
