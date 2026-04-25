@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#8b5cf6">
+    <title>Stage Planner</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #8b5cf6; --bg: #0f0f0f; --bg-secondary: #1a1a1a;
+            --bg-tertiary: #262626; --text: #f5f5f5; --text-secondary: #a3a3a3;
+            --border: #404040; --success: #10b981; --danger: #ef4444;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+        .app-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        header { background: var(--bg-secondary); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border); }
+        h1 { font-size: 24px; margin-bottom: 8px; color: var(--primary); }
+        .subtitle { color: var(--text-secondary); font-size: 14px; }
+        .main-content { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
+        @media (max-width: 968px) { .main-content { grid-template-columns: 1fr; } }
+        .sidebar { background: var(--bg-secondary); padding: 20px; border-radius: 12px; border: 1px solid var(--border); height: fit-content; }
+        .editor-area { background: var(--bg-secondary); padding: 20px; border-radius: 12px; border: 1px solid var(--border); min-height: 500px; }
+        .btn { padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #7c3aed; }
+        .btn-secondary { background: var(--bg-tertiary); color: var(--text); border: 1px solid var(--border); }
+        .btn-danger { background: var(--danger); color: white; font-size: 12px; padding: 6px 12px; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-full { width: 100%; justify-content: center; }
+        .input-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 6px; font-size: 14px; color: var(--text-secondary); }
+        input { width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
+        input:focus { outline: none; border-color: var(--primary); }
+        .project-list, .scene-list { margin-top: 20px; }
+        .project-item, .scene-item { background: var(--bg-tertiary); padding: 12px; border-radius: 8px; margin-bottom: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; position: relative; }
+        .project-item:hover, .scene-item:hover { border-color: var(--primary); }
+        .project-item.active, .scene-item.active { border-color: var(--primary); background: rgba(139, 92, 246, 0.1); }
+        .project-name { font-weight: 600; margin-bottom: 4px; }
+        .project-meta, .scene-meta { font-size: 12px; color: var(--text-secondary); }
+        .canvas-container { background: white; border-radius: 8px; overflow: hidden; margin-top: 20px; touch-action: none; }
+        #stage-canvas { display: block; width: 100%; cursor: crosshair; }
+        .toolbar { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+        .tool-btn { padding: 8px 12px; background: var(--bg-tertiary); border: 2px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--text); font-size: 13px; transition: all 0.2s; }
+        .tool-btn:hover { border-color: var(--primary); }
+        .tool-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
+        .color-picker { width: 40px; height: 36px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        .modal.active { display: flex; }
+        .modal-content { background: var(--bg-secondary); padding: 24px; border-radius: 12px; max-width: 500px; width: 100%; border: 1px solid var(--border); }
+        .modal-header { margin-bottom: 20px; }
+        .modal-header h2 { font-size: 20px; margin-bottom: 4px; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .section-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+        .empty-state h2 { color: var(--text); margin-bottom: 8px; }
+        .object-library { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; margin-top: 16px; }
+        .object-item { aspect-ratio: 1; background: var(--bg-tertiary); border: 2px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 24px; padding: 8px; }
+        .object-item:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .object-label { font-size: 10px; margin-top: 4px; text-align: center; color: var(--text-secondary); }
+        .delete-btn { position: absolute; top: 10px; right: 10px; }
+        .scene-info { background: var(--bg-tertiary); padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>🎭 Stage Planner</h1>
+            <p class="subtitle">Gestione planimetrie teatrali e oggetti di scena</p>
+        </header>
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="section-title">Progetti</div>
+                <button class="btn btn-primary btn-full" onclick="app.openNewProjectModal()">➕ Nuovo Progetto</button>
+                <div class="project-list" id="projectList"></div>
+                <div style="margin-top: 30px;" id="sceneSection">
+                    <div class="section-title">Scene</div>
+                    <button class="btn btn-secondary btn-full" onclick="app.openNewSceneModal()">➕ Nuova Scena</button>
+                    <div class="scene-list" id="sceneList"></div>
+                </div>
+            </div>
+            <div class="editor-area" id="editorArea">
+                <div class="empty-state">
+                    <h2>👈 Inizia creando un nuovo progetto</h2>
+                    <p>Crea un progetto per lo spettacolo e aggiungi le planimetrie delle scene</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal" id="newProjectModal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Nuovo Progetto</h2></div>
+            <div class="input-group">
+                <label>Nome dello Spettacolo</label>
+                <input type="text" id="projectName" placeholder="es. Amleto">
+            </div>
+            <div class="input-group">
+                <label>Descrizione (opzionale)</label>
+                <input type="text" id="projectDesc" placeholder="es. Produzione autunno 2026">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="app.closeModal('newProjectModal')">Annulla</button>
+                <button class="btn btn-primary" onclick="app.createProject()">Crea Progetto</button>
+            </div>
+        </div>
+    </div>
+    <div class="modal" id="newSceneModal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Nuova Scena</h2></div>
+            <div class="input-group">
+                <label>Numero Scena</label>
+                <input type="text" id="sceneNumber" placeholder="es. 1, 2a, Prologo...">
+            </div>
+            <div class="input-group">
+                <label>Nome/Descrizione</label>
+                <input type="text" id="sceneName" placeholder="es. Camera di Ofelia">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="app.closeModal('newSceneModal')">Annulla</button>
+                <button class="btn btn-primary" onclick="app.createScene()">Crea Scena</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        const app={state:{projects:[],currentProject:null,currentScene:null,tool:'select',color:'#000000',drawing:!1,startX:0,startY:0},canvas:null,ctx:null,init(){this.loadProjects();this.renderProjects()},loadProjects(){const t=localStorage.getItem('stagePlannerProjects');t&&(this.state.projects=JSON.parse(t))},saveProjects(){localStorage.setItem('stagePlannerProjects',JSON.stringify(this.state.projects))},openNewProjectModal(){document.getElementById('newProjectModal').classList.add('active');document.getElementById('projectName').value='';document.getElementById('projectDesc').value='';document.getElementById('projectName').focus()},createProject(){const t=document.getElementById('projectName').value.trim();if(!t)return void alert('Inserisci il nome dello spettacolo');const e={id:Date.now(),name:t,description:document.getElementById('projectDesc').value.trim(),created:(new Date).toISOString(),scenes:[]};this.state.projects.push(e);this.saveProjects();this.renderProjects();this.closeModal('newProjectModal');this.selectProject(e.id)},selectProject(t){this.state.currentProject=this.state.projects.find(e=>e.id===t);this.state.currentScene=null;this.renderProjects();this.renderScenes();this.showEditor()},deleteProject(t,e){e.stopPropagation();if(!confirm('Eliminare questo progetto e tutte le sue scene?'))return;this.state.projects=this.state.projects.filter(e=>e.id!==t);this.state.currentProject?.id===t&&(this.state.currentProject=null,this.state.currentScene=null);this.saveProjects();this.renderProjects();this.state.currentProject||this.hideEditor()},renderProjects(){const t=document.getElementById('projectList');0===this.state.projects.length?t.innerHTML='<p style="color: var(--text-secondary); font-size: 14px; margin-top: 12px;">Nessun progetto</p>':t.innerHTML=this.state.projects.map(t=>`<div class="project-item ${this.state.currentProject?.id===t.id?'active':''}" onclick="app.selectProject(${t.id})"><div class="project-name">${t.name}</div><div class="project-meta">${t.scenes.length} scene · ${new Date(t.created).toLocaleDateString('it-IT')}</div><button class="btn btn-danger delete-btn" onclick="app.deleteProject(${t.id}, event)">🗑️</button></div>`).join('')},openNewSceneModal(){if(!this.state.currentProject)return void alert('Seleziona prima un progetto');document.getElementById('newSceneModal').classList.add('active');document.getElementById('sceneNumber').value='';document.getElementById('sceneName').value='';document.getElementById('sceneNumber').focus()},createScene(){const t=document.getElementById('sceneNumber').value.trim(),e=document.getElementById('sceneName').value.trim();if(!t)return void alert('Inserisci il numero della scena');const s={id:Date.now(),number:t,name:e,created:(new Date).toISOString(),canvasData:null};this.state.currentProject.scenes.push(s);this.saveProjects();this.renderScenes();this.closeModal('newSceneModal');this.selectScene(s.id)},selectScene(t){this.state.currentScene=this.state.currentProject.scenes.find(e=>e.id===t);this.renderScenes();this.showEditor()},deleteScene(t,e){e.stopPropagation();if(!confirm('Eliminare questa scena?'))return;this.state.currentProject.scenes=this.state.currentProject.scenes.filter(e=>e.id!==t);this.state.currentScene?.id===t&&(this.state.currentScene=null);this.saveProjects();this.renderScenes();!this.state.currentScene&&this.state.currentProject.scenes.length>0?this.selectScene(this.state.currentProject.scenes[0].id):this.showEditor()},renderScenes(){const t=document.getElementById('sceneSection'),e=document.getElementById('sceneList');if(!this.state.currentProject)return void(t.style.display='none');t.style.display='block';0===this.state.currentProject.scenes.length?e.innerHTML='<p style="color: var(--text-secondary); font-size: 14px; margin-top: 12px;">Nessuna scena</p>':e.innerHTML=this.state.currentProject.scenes.map(t=>`<div class="scene-item ${this.state.currentScene?.id===t.id?'active':''}" onclick="app.selectScene(${t.id})"><div class="project-name">Scena ${t.number}</div><div class="scene-meta">${t.name||'Senza nome'}</div><button class="btn btn-danger delete-btn" onclick="app.deleteScene(${t.id}, event)">🗑️</button></div>`).join('')},showEditor(){const t=document.getElementById('editorArea');if(!this.state.currentProject)return;if(!this.state.currentScene)return void(t.innerHTML=`<div class="empty-state"><h2>${this.state.currentProject.name}</h2><p>${this.state.currentProject.description||''}</p><p style="margin-top: 20px;">Crea una scena per iniziare a disegnare la planimetria</p></div>`);const e=this.getObjectLibrary();t.innerHTML=`<div style="margin-bottom: 16px;"><h2 style="font-size: 20px; margin-bottom: 4px;">${this.state.currentProject.name}</h2><p style="color: var(--text-secondary); font-size: 14px;">${this.state.currentProject.description||'Nessuna descrizione'}</p></div><div class="toolbar"><button class="tool-btn ${'select'===this.state.tool?'active':''}" onclick="app.setTool('select')">👆 Seleziona</button><button class="tool-btn ${'rectangle'===this.state.tool?'active':''}" onclick="app.setTool('rectangle')">⬜ Rettangolo</button><button class="tool-btn ${'circle'===this.state.tool?'active':''}" onclick="app.setTool('circle')">⭕ Cerchio</button><button class="tool-btn ${'line'===this.state.tool?'active':''}" onclick="app.setTool('line')">📏 Linea</button><button class="tool-btn ${'text'===this.state.tool?'active':''}" onclick="app.setTool('text')">📝 Testo</button><input type="color" class="color-picker" value="${this.state.color}" onchange="app.state.color = this.value"><button class="tool-btn" onclick="app.clearCanvas()">🗑️ Pulisci</button><button class="btn btn-success" onclick="app.exportToPDF()">📄 Esporta PDF</button></div><div class="scene-info"><strong>Scena ${this.state.currentScene.number}</strong> - ${this.state.currentScene.name||'Senza nome'}</div><div class="section-title">Libreria Oggetti di Scena</div><div class="object-library">${e.map(t=>`<div class="object-item" onclick="app.addObjectToCanvas('${t.emoji}', '${t.label}')"><div>${t.emoji}</div><div class="object-label">${t.label}</div></div>`).join('')}</div><div class="canvas-container"><canvas id="stage-canvas" width="800" height="600"></canvas></div>`;setTimeout(()=>this.initCanvas(),100)},hideEditor(){document.getElementById('editorArea').innerHTML='<div class="empty-state"><h2>👈 Inizia creando un nuovo progetto</h2><p>Crea un progetto per lo spettacolo e aggiungi le planimetrie delle scene</p></div>'},getObjectLibrary(){return[{emoji:'🪑',label:'Sedia'},{emoji:'🛋️',label:'Divano'},{emoji:'🛏️',label:'Letto'},{emoji:'🚪',label:'Porta'},{emoji:'🪟',label:'Finestra'},{emoji:'🕯️',label:'Candela'},{emoji:'💡',label:'Luce'},{emoji:'🎭',label:'Attore'},{emoji:'👤',label:'Persona'},{emoji:'🌳',label:'Albero'},{emoji:'📚',label:'Libri'},{emoji:'🎨',label:'Quadro'}]},initCanvas(){if(this.canvas=document.getElementById('stage-canvas'),!this.canvas)return;this.ctx=this.canvas.getContext('2d');const t=this.canvas.parentElement.getBoundingClientRect();this.canvas.width=Math.min(800,t.width-40);this.canvas.height=600;this.drawGrid();this.loadCanvasData();this.canvas.addEventListener('mousedown',t=>this.handleMouseDown(t));this.canvas.addEventListener('mousemove',t=>this.handleMouseMove(t));this.canvas.addEventListener('mouseup',t=>this.handleMouseUp(t));this.canvas.addEventListener('touchstart',t=>this.handleTouchStart(t));this.canvas.addEventListener('touchmove',t=>this.handleTouchMove(t));this.canvas.addEventListener('touchend',t=>this.handleTouchEnd(t))},drawGrid(){this.ctx.strokeStyle='#e0e0e0';this.ctx.lineWidth=.5;for(let t=0;t<this.canvas.width;t+=20)this.ctx.beginPath(),this.ctx.moveTo(t,0),this.ctx.lineTo(t,this.canvas.height),this.ctx.stroke();for(let t=0;t<this.canvas.height;t+=20)this.ctx.beginPath(),this.ctx.moveTo(0,t),this.ctx.lineTo(this.canvas.width,t),this.ctx.stroke()},setTool(t){this.state.tool=t;this.showEditor()},clearCanvas(){confirm('Pulire la planimetria?')&&(this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height),this.drawGrid(),this.saveCanvasData())},handleMouseDown(t){if('select'!==this.state.tool&&(this.state.drawing=!0,this.state.startX=t.clientX-this.canvas.getBoundingClientRect().left,this.state.startY=t.clientY-this.canvas.getBoundingClientRect().top,'text'===this.state.tool)){const t=prompt('Inserisci il testo:');t&&(this.ctx.fillStyle=this.state.color,this.ctx.font='16px Arial',this.ctx.fillText(t,this.state.startX,this.state.startY),this.saveCanvasData());this.state.drawing=!1}},handleMouseMove(t){if(!this.state.drawing||'select'===this.state.tool||'text'===this.state.tool)return;const e=t.clientX-this.canvas.getBoundingClientRect().left,s=t.clientY-this.canvas.getBoundingClientRect().top;if(this.loadCanvasData(),this.ctx.strokeStyle=this.state.color,this.ctx.fillStyle=this.state.color,this.ctx.lineWidth=2,'rectangle'===this.state.tool)this.ctx.strokeRect(this.state.startX,this.state.startY,e-this.state.startX,s-this.state.startY);else if('circle'===this.state.tool){const t=Math.sqrt(Math.pow(e-this.state.startX,2)+Math.pow(s-this.state.startY,2));this.ctx.beginPath();this.ctx.arc(this.state.startX,this.state.startY,t,0,2*Math.PI);this.ctx.stroke()}else'line'===this.state.tool&&(this.ctx.beginPath(),this.ctx.moveTo(this.state.startX,this.state.startY),this.ctx.lineTo(e,s),this.ctx.stroke())},handleMouseUp(t){this.state.drawing&&'select'!==this.state.tool&&'text'!==this.state.tool&&this.saveCanvasData();this.state.drawing=!1},handleTouchStart(t){t.preventDefault();const e=t.touches[0];this.canvas.dispatchEvent(new MouseEvent('mousedown',{clientX:e.clientX,clientY:e.clientY}))},handleTouchMove(t){t.preventDefault();const e=t.touches[0];this.canvas.dispatchEvent(new MouseEvent('mousemove',{clientX:e.clientX,clientY:e.clientY}))},handleTouchEnd(t){t.preventDefault();this.canvas.dispatchEvent(new MouseEvent('mouseup',{}))},addObjectToCanvas(t,e){if(!this.canvas)return;const s=this.canvas.width/2,i=this.canvas.height/2;this.ctx.font='40px Arial';this.ctx.fillText(t,s,i);this.ctx.font='12px Arial';this.ctx.fillStyle='#000';this.ctx.fillText(e,s,i+30);this.saveCanvasData()},saveCanvasData(){this.state.currentScene&&(this.state.currentScene.canvasData=this.canvas.toDataURL(),this.saveProjects())},loadCanvasData(){if(!this.state.currentScene||!this.state.currentScene.canvasData)return this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height),void this.drawGrid();const t=new Image;t.onload=()=>{this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);this.ctx.drawImage(t,0,0)};t.src=this.state.currentScene.canvasData},async exportToPDF(){if(!this.state.currentProject)return;const{jsPDF:t}=window.jspdf,e=new t('landscape');let s=20;e.setFontSize(24);e.text(this.state.currentProject.name,20,s);s+=10;e.setFontSize(12);this.state.currentProject.description&&(e.text(this.state.currentProject.description,20,s),s+=10);e.text(`Data: ${new Date().toLocaleDateString('it-IT')}`,20,s);e.text(`Scene totali: ${this.state.currentProject.scenes.length}`,20,s+7);for(let t=0;t<this.state.currentProject.scenes.length;t++){const s=this.state.currentProject.scenes[t];e.addPage();e.setFontSize(18);e.text(`Scena ${s.number}`,20,20);e.setFontSize(12);s.name&&e.text(s.name,20,30);s.canvasData&&e.addImage(s.canvasData,'PNG',20,40,240,180)}e.save(`${this.state.currentProject.name}_planimetrie.pdf`)},closeModal(t){document.getElementById(t).classList.remove('active')}};app.init();
+    </script>
+</body>
+</html>
