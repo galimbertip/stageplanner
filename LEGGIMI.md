@@ -1,4 +1,4 @@
-# GPverse StagePlanner V2.1.0 — Come si usa
+# GPverse StagePlanner V2.1.1 — Come si usa
 
 ## Primo avvio
 Apri https://galimbertip.github.io/stageplanner/ con Chrome (o Edge). Per averla come app: menu del browser → «Installa app» / «Aggiungi a schermata Home». Per provare subito premi **✨ Prova la demo** (tu sei NINO).

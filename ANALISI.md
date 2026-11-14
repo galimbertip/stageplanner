@@ -1,4 +1,4 @@
-# Confronto con le app simili
+# GPverse StagePlanner — confronto con le app simili
 
 ## Imparare la parte (ricerca aggiornata al 14/11/2026)
 | App | Punti forti (ripresi e migliorati) | Punti deboli (colmati) |

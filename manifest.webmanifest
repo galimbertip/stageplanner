@@ -1,6 +1,6 @@
 {
   "name": "GPverse StagePlanner",
-  "short_name": "StagePlanner",
+  "short_name": "GPverse Stage",
   "description": "Impara la parte: carica il copione, scegli il ruolo e ascolta. Prove con partner vocale, palco e scenografia in pianta e dal pubblico.",
   "lang": "it",
   "start_url": "./index.html",
@@ -44,5 +44,6 @@
         }
       ]
     }
-  }
+  },
+  "version": "2.1.1"
 }

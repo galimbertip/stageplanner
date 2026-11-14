@@ -7,6 +7,13 @@ Schema: **V.maior.minor.patch**
 
 La versione è visibile nell'app (in alto, accanto al logo) e cliccandola si vedono le novità.
 
+## V2.1.1 — 14/11/2026
+Marchio GPverse ovunque.
+- Tutti i file prodotti dall'app iniziano con «GPverse_»: backup e condivisioni (.stage), copione in testo, immagini del palco, audio per l'auto.
+- Stampe e PDF (copione, libro di regia) con intestazione e piè di pagina GPverse StagePlanner e versione.
+- Immagini del palco con il marchio GPverse nell'angolo; testo esportato con intestazione GPverse.
+- App installata con nome «GPverse Stage»; la cache dell'app è legata al numero di versione.
+
 ## V2.1.0 — 14/11/2026
 Prima l'attore: copione → ruolo → ascolta.
 - Nuovo percorso **«Impara una parte»** in 2 passi: carichi il copione, tocchi il tuo ruolo, ascolti. Il palco diventa facoltativo (resta il primo passo dei «Progetti di regia»).

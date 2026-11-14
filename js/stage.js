@@ -573,7 +573,8 @@ const Stage = (() => {
       const img = new Image(); const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
       await new Promise(r => { img.onload = r; img.onerror = r; img.src = url; });
       const W = 1800, H = Math.round(W * (img.height / img.width || 0.66)); const c = document.createElement('canvas'); c.width = W; c.height = H;
-      c.getContext('2d').drawImage(img, 0, 0, W, H); URL.revokeObjectURL(url);
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0, W, H); URL.revokeObjectURL(url);
+      g.font = '700 22px system-ui, sans-serif'; g.textAlign = 'right'; g.fillStyle = 'rgba(58,232,255,.85)'; g.fillText(`GPverse StagePlanner ${APP.version}`, W - 18, H - 18);
       await new Promise(r => c.toBlob(b => { download(`${slug(p.title)}_${n}_${E.idx < 0 ? 'inizio' : 'riga' + (E.idx + 1)}.png`, b); r(); }, 'image/png'));
     }
   }

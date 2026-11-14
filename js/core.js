@@ -2,9 +2,15 @@
  * Versione: vedi APP.version e CHANGELOG.md (schema V.maior.minor.patch) */
 'use strict';
 
-const APP = { name: 'GPverse StagePlanner', version: 'V2.1.0' };
+const APP = { name: 'GPverse StagePlanner', version: 'V2.1.1' };
 
 const CHANGELOG = [
+  { v: 'V2.1.1', d: '14/11/2026', t: 'Marchio GPverse ovunque', items: [
+    'Tutti i file prodotti dall\'app iniziano con «GPverse_»: backup e condivisioni (.stage), copione in testo, immagini del palco, audio per l\'auto.',
+    'Stampe e PDF (copione, libro di regia) con intestazione e piè di pagina GPverse StagePlanner e versione.',
+    'Immagini del palco con il marchio GPverse nell\'angolo; testo esportato con intestazione GPverse.',
+    'App installata con nome «GPverse Stage»; la cache dell\'app è legata al numero di versione.'
+  ]},
   { v: 'V2.1.0', d: '14/11/2026', t: 'Prima l\'attore: copione → ruolo → ascolta', items: [
     'Nuovo percorso «Impara una parte» in 2 passi: carichi il copione, tocchi il tuo ruolo e ascolti. Il palco diventa facoltativo (lo definisci quando ti serve).',
     'Nuova scheda Ascolta, la prima: «Tutto, anche le mie battute» (come una canzone, ripetute 1-3 volte), «Allenamento» (gli altri parlano, al tuo turno pausa giusta, tocco o microfono) e «Solo le mie battute» (con la battuta d\'attacco).',
@@ -64,6 +70,7 @@ function sheet(title, body, onOpen) {
 }
 function closeSheet() { if (sheetEl) { sheetEl.remove(); sheetEl = null; } }
 function download(name, data, type = 'application/json') {
+  if (!/^GPverse_/.test(name)) name = 'GPverse_' + name;
   const blob = data instanceof Blob ? data : new Blob([data], { type });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
@@ -678,11 +685,14 @@ function renderAltro() {
 /* stampa */
 function printHTML(title, body) {
   const w = window.open('', '_blank'); if (!w) { toast('Consenti le finestre pop-up per stampare'); return; }
-  w.document.write(`<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+  w.document.write(`<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>GPverse — ${esc(title)}</title><style>
     body{font:12pt/1.45 Georgia,serif;color:#111;margin:18mm}h1{font:700 20pt system-ui;margin:0 0 4px}h2{font:700 13pt system-ui;margin:22px 0 8px;border-bottom:1px solid #999;page-break-after:avoid}
     .m{color:#555;font-size:10pt}.l{margin:0 0 6px;page-break-inside:avoid}.s{font:700 9.5pt system-ui;letter-spacing:.06em}.d{font-style:italic;color:#444}.mine{background:#fff3a6;padding:2px 4px}
     .cue{font:9pt monospace;color:#8a5a00}.blk{display:grid;grid-template-columns:1fr 1fr;gap:10px;page-break-inside:avoid;margin:10px 0 18px}.blk svg{width:100%;height:auto;border:1px solid #ccc}.cap{grid-column:1/-1;font-size:10pt}
-    @page{margin:14mm}</style></head><body>${body}<script>setTimeout(()=>print(),400)<\/script></body></html>`);
+    @page{margin:14mm}.gpv{display:flex;align-items:center;gap:8px;font:700 9pt system-ui;letter-spacing:.18em;color:#5a4bd1;margin-bottom:10px}.gpv img{width:26px;height:26px;border-radius:6px}
+    .gpf{margin-top:28px;padding-top:6px;border-top:1px solid #ccc;font:8.5pt system-ui;color:#777}</style></head><body>
+    <div class="gpv"><img src="${location.href.replace(/[^/]*$/, '')}assets/logo.jpg" alt="">GPVERSE · STAGEPLANNER · ${APP.version}</div>${body}
+    <div class="gpf">Creato con GPverse StagePlanner ${APP.version} · ${new Date().toLocaleDateString('it-IT')}</div><script>setTimeout(()=>print(),400)<\/script></body></html>`);
   w.document.close();
 }
 function printScript() {
@@ -709,7 +719,7 @@ function printBook() {
 async function exportProject(withRec, share) {
   const p = JSON.parse(JSON.stringify(S.p));
   if (share) { p.prog = {}; p.chars.forEach(c => { c.mine = false; }); }
-  const out = { app: 'gpverse-stageplanner', ver: APP.version, project: p, audio: {} };
+  const out = { app: 'gpverse-stageplanner', brand: 'GPverse', ver: APP.version, project: p, audio: {} };
   if (withRec) {
     const keys = (await DB.keys('audio')).filter(k => String(k).startsWith(p.id + ':'));
     for (const k of keys) {
@@ -792,7 +802,7 @@ const ACT = {
     sheet('Incolla il copione', `<textarea id="pasteTx" rows="12" placeholder="SCENA 1&#10;MARIO: Buongiorno!&#10;(Entra Lucia)&#10;LUCIA: Buongiorno a te."></textarea><div class="acts"><button class="go" data-act="pasteGo">Usa questo testo</button></div>`, el => $('#pasteTx', el).focus());
   },
   pasteGo() { const t = $('#pasteTx').value.trim(); if (!t) return; closeSheet(); replaceScript(parseParagraphs(textToParas(t))); },
-  exportTxt() { const p = S.p; download(slug(p.title) + '.txt', p.lines.map(l => l.t === 'head' ? '\n' + l.x.toUpperCase() : l.t === 'dlg' ? `${l.s}: ${l.x}` : `(${l.x})`).join('\n'), 'text/plain'); },
+  exportTxt() { const p = S.p; download(slug(p.title) + '.txt', `${p.title}\n[GPverse StagePlanner ${APP.version}]\n\n` + p.lines.map(l => l.t === 'head' ? '\n' + l.x.toUpperCase() : l.t === 'dlg' ? `${l.s}: ${l.x}` : `(${l.x})`).join('\n'), 'text/plain'); },
   mine(el) { const c = getChar(S.p, el.dataset.n); c.mine = !c.mine; touch(); renderTab(); },
   qPick() { Quick.pick(); }, qPhoto() { Quick.photo(); }, qPaste() { S.q.paste = true; render(); setTimeout(() => $('#qTx') && $('#qTx').focus(), 50); },
   qPasteGo() { const t = $('#qTx').value.trim(); if (!t) return; S.q.lines = parseParagraphs(textToParas(t)); S.q.title = S.q.title || 'Il mio copione'; S.q.step = 1; render(); },

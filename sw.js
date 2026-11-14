@@ -1,6 +1,6 @@
 /* GPverse StagePlanner — service worker: funziona anche senza internet.
  * Prima la rete (gli aggiornamenti arrivano subito), senza rete la copia salvata. */
-const CACHE = 'stageplanner-v2.1.0';
+const CACHE = 'gpverse-stageplanner-V2.1.1'; // allineare sempre ad APP.version in js/core.js
 const SHELL = ['./', './index.html', './js/core.js', './js/stage.js', './js/prove.js', './manifest.webmanifest',
   './assets/logo.jpg', './assets/icon.png', './assets/icon-192.png', './assets/icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
