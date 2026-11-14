@@ -1,15 +1,27 @@
-# Confronto con le app simili (novembre 2026)
+# Confronto con le app simili
 
-## Imparare la parte
-| App | Punti forti (ripresi in StagePlanner) | Punti deboli (colmati) |
+## Imparare la parte (ricerca aggiornata al 14/11/2026)
+| App | Punti forti (ripresi e migliorati) | Punti deboli (colmati) |
 |---|---|---|
-| Rehearsal® Pro | Evidenziazione, battute oscurate («blackout»), teleprompter, ritmo regolabile | 19,99 $, solo iOS/iPad, bug segnalati dagli utenti |
-| LineLearner | Registri la scena e la riascolti con una pausa al posto della tua battuta, «come una canzone» | Solo registrazioni, niente controllo di cosa dici |
-| Line Learner & Teleprompter | Registrazione battuta per battuta degli altri personaggi, sequenza automatica con pause | 14,99 $, solo iPad |
-| Scene Partner / ActingPal / Linus / coldRead | Partner con voci, ascolto della tua battuta | Abbonamenti e gettoni, voci robotiche, riconoscimento instabile, servono internet e account |
-| HitCue | «Impara le tue battute, non tutta la scena»: focus sulla battuta d'attacco | Solo memorizzazione |
+| LineLearner | Registri la scena e la riascolti con un silenzio lungo esattamente quanto la tua battuta; «impari come una canzone»; scegli dove lasciare il vuoto | Interfaccia poco intuitiva e import del copione macchinoso (le lamentele principali); voto 2,9 su Google Play; voci solo registrate |
+| Rehearsal® Pro | Copione evidenziato, battute coperte («Peekaboo»), ascolto in auto mentre il copione scorre | 22,99 € solo iPad; l'opzione «Importa in Rehearsal» a volte non compare |
+| Script Rehearser | Ascolto, «aspetta me», pausa automatica, bip al tuo turno, rilettura della battuta corretta | Registrare la propria voce e scegliere le voci è a pagamento (fino a 29,99 $); i PDF scansionati non si importano |
+| Script Buddy | Apri il copione, evidenzi il ruolo e provi in pochi secondi; legge tutto o solo alcune parti, tace le tue | Problemi di import con alcuni PDF |
+| ScenePartner, ScriptReady, LineBuddies e simili | Voci IA per gli altri personaggi, ascolto passivo a ripetizione, voci registrate dai compagni | Abbonamenti (ScriptReady fino a 199 $/anno), limiti nella versione gratuita, solo inglese |
+| Run Lines, Doing Lines | Prima lettera delle parole, versione «ridotta» per concentrarsi sulle proprie battute, esportazione audio | Le funzioni migliori sono a pagamento |
+| Cue-to-Cue | Foto delle pagine come import; sbirciare senza fermare la scena; acquisto unico | Solo iPhone/iPad |
+| coldRead | Il lettore parte quando senti dire l'ultima parola | Il riconoscimento a volte non sente l'attacco e blocca la scena |
 
-**In StagePlanner**: tutte queste modalità in un'unica app gratuita, in italiano, su qualsiasi dispositivo, senza account; partner vocale con voce diversa per personaggio **e** registrazioni vere; microfono con confronto parola per parola e voto automatico; ripasso che parte dalle battute più deboli; conto alla rovescia al debutto con battute al giorno.
+**In StagePlanner V2.1.0**
+- Avvio in 2 passi (copione → ruolo → ascolta), con controllo di come è stato letto il copione: risolve l'import macchinoso.
+- Import da PDF (anche **scansionati**), Word, testo, **foto delle pagine** (riconoscimento del testo in italiano) e **condivisione diretta** da WhatsApp/mail.
+- Tre ascolti: tutto (ripetizioni delle tue battute), allenamento, solo le tue (con l'ultima frase d'attacco: la versione «ridotta»).
+- **Aiuto a scalare in ascolto** (tutta → metà → prima parola → silenzio): l'equivalente sonoro del copione nascosto a livelli, che nelle altre app esiste solo sullo schermo.
+- Pausa lunga quanto la tua registrazione (come LineLearner), bip, rilettura corretta, microfono che controlla parola per parola; se non sente, si passa avanti con un tocco invece di bloccarsi.
+- Voci sintetiche gratuite **e** voci vere registrate da te o dai compagni; audio scaricabile per l'auto.
+- Gratis, in italiano, su Android, iPhone e PC, senza account, dati sul dispositivo.
+
+Limite onesto: la voce sintetica del browser non si può salvare in un file; per l'audio da scaricare servono le registrazioni. Con lo schermo spento alcuni telefoni sospendono la voce sintetica: per questo c'è l'audio scaricabile.
 
 ## Palco e regia
 | App | Punti forti (ripresi) | Punti deboli (colmati) |

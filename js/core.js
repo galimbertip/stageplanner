@@ -2,9 +2,19 @@
  * Versione: vedi APP.version e CHANGELOG.md (schema V.maior.minor.patch) */
 'use strict';
 
-const APP = { name: 'GPverse StagePlanner', version: 'V2.0.0' };
+const APP = { name: 'GPverse StagePlanner', version: 'V2.1.0' };
 
 const CHANGELOG = [
+  { v: 'V2.1.0', d: '14/11/2026', t: 'Prima l\'attore: copione → ruolo → ascolta', items: [
+    'Nuovo percorso «Impara una parte» in 2 passi: carichi il copione, tocchi il tuo ruolo e ascolti. Il palco diventa facoltativo (lo definisci quando ti serve).',
+    'Nuova scheda Ascolta, la prima: «Tutto, anche le mie battute» (come una canzone, ripetute 1-3 volte), «Allenamento» (gli altri parlano, al tuo turno pausa giusta, tocco o microfono) e «Solo le mie battute» (con la battuta d\'attacco).',
+    'Aiuto a scalare in ascolto: senti tutta la tua battuta e la ripeti, poi solo metà, poi la prima parola, poi silenzio. Bip quando tocca a te, «fammela sentire giusta», salta le battute lontane, ricomincia da capo.',
+    'La pausa dura quanto la tua battuta registrata; le registrazioni parziali vengono tagliate al punto giusto.',
+    'Scarica l\'audio (WAV) costruito dalle registrazioni, da ascoltare in auto o a schermo spento.',
+    'Import più facile: PDF scansionati e foto delle pagine con riconoscimento del testo, condivisione del file direttamente da WhatsApp o dalla mail (app installata), controllo dei personaggi prima di partire.',
+    'Il tuo ruolo è sempre in vista sotto il titolo: si cambia con un tocco.',
+    'Schede riordinate: Ascolta · Prove · Copione · Palco · Altro (personaggi e voci in Altro).'
+  ]},
   { v: 'V2.0.0', d: '13/11/2026', t: 'Rinascita GPverse: impara la parte + palco in 2 viste', items: [
     'Nuova grafica GPverse (logo, colori neon, versione cliccabile con le novità).',
     'Ogni nuovo progetto parte dalla definizione del palco: all\'italiana, tre lati, arena, piazza; misure in metri, boccascena, proscenio, quinte. Modelli pronti.',
@@ -63,6 +73,18 @@ function pickFile(accept) {
     const i = document.createElement('input'); i.type = 'file'; i.accept = accept;
     i.onchange = () => res(i.files[0] || null); i.click();
   });
+}
+function pickFiles(accept, opts = {}) {
+  return new Promise(res => {
+    const i = document.createElement('input'); i.type = 'file'; i.accept = accept; i.multiple = !!opts.multiple; if (opts.capture) i.setAttribute('capture', 'environment');
+    i.onchange = () => res(Array.from(i.files || [])); i.click();
+  });
+}
+let busyEl = null;
+function busy(msg) {
+  if (!msg) { busyEl && busyEl.remove(); busyEl = null; return; }
+  if (!busyEl) { busyEl = document.createElement('div'); busyEl.className = 'busy'; document.body.appendChild(busyEl); }
+  busyEl.innerHTML = `<div class="card"><div class="spin"></div><div>${esc(msg)}</div></div>`;
 }
 function loadScript(src) {
   return new Promise((res, rej) => {
@@ -212,8 +234,27 @@ function textToParas(txt) {
   });
   return out;
 }
+const OCR_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+const isImage = f => /^image\//.test(f.type) || /\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(f.name);
+/** riconoscimento del testo (foto, PDF scansionati) — scarica il motore la prima volta */
+async function ocr(srcs) {
+  busy('Carico il riconoscimento del testo… (serve internet la prima volta)');
+  try { await loadScript(OCR_URL); } catch { busy(null); throw new Error('riconoscimento del testo non disponibile senza internet'); }
+  let cur = 1;
+  const w = await window.Tesseract.createWorker('ita', 1, { logger: m => { if (m.status === 'recognizing text') busy(`Leggo il testo… pagina ${cur}/${srcs.length} · ${Math.round(m.progress * 100)}%`); } });
+  let out = '';
+  try { for (let k = 0; k < srcs.length; k++) { cur = k + 1; const { data } = await w.recognize(srcs[k]); out += data.text + '\n\n'; } }
+  finally { await w.terminate(); busy(null); }
+  return out;
+}
+async function filesToParas(files) {
+  const imgs = files.filter(isImage);
+  if (imgs.length && imgs.length === files.length) return textToParas(await ocr(imgs));
+  return fileToParas(files.find(f => !isImage(f)) || files[0]);
+}
 async function fileToParas(file) {
   const name = file.name.toLowerCase();
+  if (isImage(file)) return textToParas(await ocr([file]));
   if (name.endsWith('.docx')) {
     await loadScript('lib/mammoth.browser.min.js');
     const r = await window.mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
@@ -236,6 +277,15 @@ async function fileToParas(file) {
       const med = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 14;
       rows.forEach((r, k) => { if (k && Math.abs(rows[k - 1].y - r.y) > med * 1.45) text += '\n'; text += r.t + '\n'; });
       text += '\n';
+    }
+    if (text.replace(/\s/g, '').length < 40 * pdf.numPages) { // PDF scansionato: niente testo, solo immagini
+      const canv = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        busy(`PDF scansionato: preparo la pagina ${i}/${pdf.numPages}…`);
+        const pg = await pdf.getPage(i); const vp = pg.getViewport({ scale: 2 }); const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+        await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; canv.push(c);
+      }
+      text = await ocr(canv);
     }
     return textToParas(text.replace(/^\s*\d+\s*$/gm, ''));
   }
@@ -303,8 +353,28 @@ const App = {
     window.addEventListener('beforeunload', () => saveNow());
     document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+    if (/[?&]shared=1/.test(location.search)) {
+      history.replaceState(null, '', location.pathname);
+      try {
+        const c = await caches.open('sp-shared'); const r = await c.match('./__shared');
+        if (r) {
+          const f = new File([await r.blob()], decodeURIComponent(r.headers.get('x-name') || 'copione'), { type: r.headers.get('content-type') || '' });
+          await c.delete('./__shared'); Quick.start(); Quick.load([f]); return;
+        }
+      } catch {}
+    }
     const last = LS.get('last', null);
-    if (last && S.projects.find(p => p.id === last)) openProject(last, LS.get('tab', 'copione')); else render();
+    if (last && S.projects.find(p => p.id === last)) openProject(last, LS.get('tab', 'ascolta')); else render();
+  },
+  roleSheet() {
+    const p = S.p; if (!p) return;
+    if (!p.chars.length) { toast('Prima carica il copione'); return; }
+    const counts = {}; p.lines.forEach(l => { if (l.t === 'dlg') counts[l.s] = (counts[l.s] || 0) + 1; });
+    const body = () => `<p class="small muted" style="margin-top:0">Tocca il tuo personaggio (anche più di uno, per i doppi ruoli). Le sue battute verranno evidenziate, nascoste nelle prove e lasciate a te nell'ascolto.</p>
+      <div class="row">${p.chars.filter(c => c.n !== 'TUTTI').sort((a, b) => (counts[b.n] || 0) - (counts[a.n] || 0)).map(c => `<button class="chip" data-act="roleTog" data-n="${esc(c.n)}" aria-pressed="${!!c.mine}"><span style="color:${c.c}">●</span> ${esc(c.n)} <span class="badge">${counts[c.n] || 0}</span></button>`).join('')}</div>
+      <p class="small muted">Nomi doppi o sbagliati? Correggili in Altro → Personaggi (⋯ → rinomina con il nome giusto per unirli).</p>
+      <div class="acts"><button class="go" data-act="closeSheet">Fatto</button></div>`;
+    sheet('🎭 Il tuo ruolo', body());
   }
 };
 
@@ -322,24 +392,31 @@ function render() {
   const app = $('#app'); const nav = $('#nav');
   if (S.view === 'home') { nav.hidden = true; app.innerHTML = renderHome(); }
   else if (S.view === 'wizard') { nav.hidden = true; app.innerHTML = renderWizard(); Wizard.after(); }
+  else if (S.view === 'quick') { nav.hidden = true; app.innerHTML = Quick.html(); Quick.after(); }
   else if (S.view === 'project') {
     nav.hidden = false; nav.innerHTML = navHTML();
-    app.innerHTML = header(S.p.title, 'GPVERSE · STAGEPLANNER') + `<div id="tab"></div>` + footer();
+    app.innerHTML = header(S.p.title, 'GPVERSE · STAGEPLANNER') + `<div id="role"></div><div id="tab"></div>` + footer();
     renderTab();
   }
 }
 function footer() { return `<div class="foot"><span>GPverse StagePlanner · ${APP.version}</span><span>I dati restano su questo dispositivo</span></div>`; }
-const TABS = [['copione', '📜', 'Copione'], ['prove', '🎭', 'Prove'], ['palco', '🎬', 'Palco'], ['compagnia', '👥', 'Compagnia'], ['altro', '⚙', 'Altro']];
+const TABS = [['ascolta', '🎧', 'Ascolta'], ['prove', '🎭', 'Prove'], ['copione', '📜', 'Copione'], ['palco', '🎬', 'Palco'], ['altro', '⚙', 'Altro']];
+function roleBar() {
+  const p = S.p; if (!p.chars.length) return '';
+  const me = myNames(p);
+  return `<button class="rolebar" data-act="roleSheet">🎭 <span class="muted">Il tuo ruolo:</span> ${me.length ? me.map(n => `<b style="color:${charColor(p, n)}">${esc(n)}</b>`).join(', ') : '<b style="color:var(--warn)">tocca per sceglierlo</b>'}<span class="sp"></span><span class="small muted">cambia ✎</span></button>`;
+}
 function navHTML() { return TABS.map(([k, i, l]) => `<button data-act="tab" data-k="${k}" aria-current="${S.tab === k}"><span>${i}</span>${l}</button>`).join(''); }
 function renderTab() {
   const el = $('#tab'); if (!el) return;
-  LS.set('tab', S.tab);
+  if (S.tab === 'compagnia') S.tab = 'altro';
+  LS.set('tab', S.tab); const rb = $('#role'); if (rb) rb.innerHTML = roleBar();
   $$('#nav button').forEach(b => b.setAttribute('aria-current', b.dataset.k === S.tab));
-  if (S.tab === 'copione') el.innerHTML = renderCopione();
+  if (S.tab === 'ascolta') el.innerHTML = Prove.listenHTML();
+  else if (S.tab === 'copione') el.innerHTML = renderCopione();
   else if (S.tab === 'prove') el.innerHTML = Prove.tabHTML();
   else if (S.tab === 'palco') { el.innerHTML = Stage.tabHTML(); Stage.mount(); }
-  else if (S.tab === 'compagnia') el.innerHTML = renderCompagnia();
-  else if (S.tab === 'altro') el.innerHTML = renderAltro();
+  else if (S.tab === 'altro') el.innerHTML = renderCompagnia() + renderAltro();
   if (S.tab === 'copione' && S.jump != null) {
     const r = $(`.ln[data-i="${S.jump}"]`); S.jump = null;
     if (r) { r.scrollIntoView({ block: 'center' }); r.classList.add('flash'); }
@@ -360,15 +437,58 @@ function renderHome() {
   }).join('');
   return header('StagePlanner') + `
   <div class="hero"><img src="assets/logo.jpg" alt=""><div><h3>Impara la parte. Disegna il palco.</h3>
-    <p class="small">Per attori e compagnie, professionisti e amatoriali: copione, prove con partner vocale, scenografia e movimenti in pianta e dal pubblico.</p></div></div>
-  <div class="row" style="margin-bottom:14px">
-    <button class="go" data-act="newProject">＋ Nuovo progetto</button>
-    <button data-act="importProject">⬆ Importa progetto</button>
-    <button data-act="demo">✨ Prova la demo</button>
+    <p class="small">Per attori e compagnie, professionisti e amatoriali.</p></div></div>
+  <div class="starts">
+    <button class="start card go" data-act="quickStart"><span class="ic">🎭</span><span><b>Impara una parte</b><small>Carica il copione (PDF, Word, foto), scegli il tuo ruolo e ascolta. Pronto in un minuto.</small></span></button>
+    <button class="start card" data-act="newProject"><span class="ic">🎬</span><span><b>Progetto di regia</b><small>Parti dal palco: misure, scenografia, movimenti in pianta e dal pubblico, più il copione per la compagnia.</small></span></button>
   </div>
-  ${S.projects.length ? `<div class="plist">${cards}</div>` : `<div class="card empty"><p>Nessun progetto ancora.</p><p class="small">Un nuovo progetto parte sempre dal <b>palco</b>: misure e forma di dove andrete in scena.</p></div>`}
+  <div class="row" style="margin:12px 0 14px"><button data-act="importProject">⬆ Apri un file .stage</button><button data-act="demo">✨ Prova la demo</button></div>
+  ${S.projects.length ? `<h2 class="sec">I TUOI SPETTACOLI</h2><div class="plist">${cards}</div>` : ''}
   ${footer()}`;
 }
+
+/* IMPARA UNA PARTE — percorso rapido: copione → ruolo → ascolta */
+const Quick = {
+  start() { S.q = { step: 0, lines: [], mine: [], title: '' }; S.view = 'quick'; render(); window.scrollTo(0, 0); },
+  async pick() { const fs = await pickFiles('.docx,.pdf,.txt,.html,.htm,text/plain,image/*', { multiple: true }); if (fs.length) this.load(fs); },
+  async photo() { const fs = await pickFiles('image/*', { multiple: true, capture: true }); if (fs.length) this.load(fs); },
+  async load(fs) {
+    try {
+      busy('Leggo il copione…'); const lines = parseParagraphs(await filesToParas(fs)); busy(null);
+      if (!lines.some(l => l.t === 'dlg')) toast('Non ho trovato battute nel formato NOME: testo. Controlla il risultato.', 4500);
+      S.q.lines = lines; S.q.file = fs.length > 1 ? fs.length + ' foto' : fs[0].name;
+      S.q.title = fs.length === 1 && !isImage(fs[0]) ? fs[0].name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ') : 'Il mio copione'; S.q.step = 1; render();
+    } catch (e) { busy(null); toast('Non riesco a leggere il file: ' + e.message, 4500); }
+  },
+  html() {
+    const q = S.q;
+    const steps = `<div class="steps"><span class="${q.step === 0 ? 'on' : 'done'}">1 · Copione</span><span class="${q.step === 1 ? 'on' : ''}">2 · Il tuo ruolo</span><span>3 · Ascolta</span></div>`;
+    if (q.step === 0) return header('Impara una parte', 'GPVERSE · STAGEPLANNER') + steps + `<div class="card" style="max-width:760px">
+      <div class="drop" id="qDrop"><p style="font-size:34px;margin:0">📜</p><p><b>Carica il copione</b></p>
+        <div class="row" style="justify-content:center"><button class="go" data-act="qPick">📄 Scegli il file</button><button data-act="qPhoto">📷 Fotografa le pagine</button><button data-act="qPaste">📋 Incolla il testo</button></div>
+        <p class="small">PDF (anche scansionati), Word, testo o foto delle pagine. Puoi anche trascinarlo qui.</p></div>
+      ${q.paste ? `<div class="fld" style="margin-top:12px"><textarea id="qTx" rows="9" placeholder="ROSA: Sono le nove passate.&#10;CARLO (sedendosi): Arriverà."></textarea><div class="acts"><button class="go" data-act="qPasteGo">Usa questo testo</button></div></div>` : ''}
+      <p class="small muted">Ti è arrivato su WhatsApp o per mail? Installa l'app (menu del browser → «Installa» / «Aggiungi a schermata Home»), poi dal file tocca <b>Condividi → StagePlanner</b>.</p></div>
+      <div class="navbtns"><button data-act="qBack">← Annulla</button></div>`;
+    const sm = scriptSummary(q.lines);
+    const prev = q.lines.filter(l => l.t === 'dlg').slice(0, 8).map(l => `<div class="small"><b style="font-family:var(--f-display);font-size:11px;letter-spacing:.06em">${esc(l.s)}</b> ${esc(l.x.slice(0, 90))}${l.x.length > 90 ? '…' : ''}</div>`).join('');
+    return header('Impara una parte', 'GPVERSE · STAGEPLANNER') + steps + `<div class="card" style="max-width:760px">
+      <div class="fld"><label class="f" for="qTitle">Titolo</label><input id="qTitle" value="${esc(q.title)}"></div>
+      <p class="small">✓ ${sm.dlg} battute · ${sm.chars.length} personaggi · ${sm.heads || 1} ${(sm.heads || 1) === 1 ? 'scena' : 'scene'}${q.file ? ' · ' + esc(q.file) : ''}</p>
+      <h3>Chi sei?</h3>
+      <div class="row">${sm.chars.filter(([n]) => n !== 'TUTTI').map(([n, k]) => `<button class="chip" data-act="qMine" data-n="${esc(n)}" aria-pressed="${q.mine.includes(n)}">${esc(n)} <span class="badge">${k}</span></button>`).join('') || '<span class="muted">Nessun personaggio riconosciuto.</span>'}</div>
+      <details style="margin-top:12px"><summary class="small muted">Controlla com'è stato letto il copione</summary><div style="margin-top:8px;display:grid;gap:4px">${prev || '<span class="muted small">Nessuna battuta riconosciuta: il formato migliore è NOME: battuta.</span>'}</div></details>
+      </div><div class="navbtns"><button data-act="qBack">← Cambia copione</button><button class="go" data-act="qGo">🎧 Inizia ad ascoltare</button></div>`;
+  },
+  after() { const d = $('#qDrop'); if (d) bindDrop(d, f => this.load([f])); },
+  async finish() {
+    const q = S.q; if (!q.mine.length && !confirm('Non hai scelto il tuo ruolo: potrai farlo dopo. Continuare?')) return;
+    const p = newProject(Object.assign(Stage.defaults(), Stage.presets[0].s), { title: ($('#qTitle') && $('#qTitle').value.trim()) || q.title || 'Il mio copione' });
+    p.lines = q.lines; ensureChars(p); p.chars.forEach(c => { c.mine = q.mine.includes(c.n); });
+    S.projects.unshift(p); S.p = p; await saveNow(); S.q = null; openProject(p.id, 'ascolta');
+    toast(q.mine.length ? 'Pronto: scegli come ascoltare e premi ▶' : 'Progetto creato');
+  }
+};
 
 /* WIZARD nuovo progetto: 1 palco → 2 spettacolo → 3 copione → 4 chi sei */
 const Wizard = {
@@ -395,7 +515,7 @@ const Wizard = {
     const w = S.wiz; const p = newProject(w.stage, w.info); p.lines = w.lines; ensureChars(p);
     p.chars.forEach(c => { c.mine = w.mine.includes(c.n); });
     // persone già in scena per ogni personaggio, nascoste finché non le posizioni
-    S.projects.unshift(p); S.p = p; await saveNow(); S.wiz = null; openProject(p.id, p.lines.length ? (p.chars.some(c => c.mine) ? 'prove' : 'copione') : 'palco');
+    S.projects.unshift(p); S.p = p; await saveNow(); S.wiz = null; openProject(p.id, p.lines.length ? 'ascolta' : 'palco'); if (p.lines.length && !p.chars.some(c => c.mine)) setTimeout(() => App.roleSheet(), 300);
     toast('Progetto creato ✓');
   }
 };
@@ -447,7 +567,7 @@ async function openProject(id, tab) {
 }
 function migrate(p) {
   p.stage = Object.assign(Stage.defaults(), p.stage || {}); p.lines = p.lines || []; p.chars = p.chars || []; p.els = p.els || []; p.blk = p.blk || {}; p.prog = p.prog || {};
-  p.narrator = p.narrator || { voice: '', pitch: 1, rate: 1 };
+  p.narrator = p.narrator || { voice: '', pitch: 1, rate: 1 }; p.recd = p.recd || {};
 }
 
 /* COPIONE */
@@ -477,14 +597,14 @@ function renderCopione() {
       <input type="search" data-inp="search" placeholder="Cerca…" value="${esc(S.search)}" aria-label="Cerca nel copione">
       <button data-act="importScript" title="Importa / sostituisci copione">⬆</button>
     </div>
-    ${me.length ? '' : `<div class="card small" style="margin-bottom:10px">Scegli il tuo personaggio in <a href="#" data-act="tab" data-k="compagnia">Compagnia</a> per evidenziare le tue battute.</div>`}
+    ${me.length ? '' : `<div class="card small" style="margin-bottom:10px"><button class="chip" data-act="roleSheet">🎭 Scegli il tuo ruolo</button> per evidenziare le tue battute.</div>`}
     <div class="script">${html || '<p class="muted">Nessuna riga corrisponde.</p>'}</div>
     <p class="small muted">Tocca una riga per provarla, vederla sul palco o modificarla.</p>`;
 }
 function lineSheet(i) {
   const p = S.p; const l = p.lines[i];
   sheet(l.t === 'head' ? 'Scena' : 'Riga ' + (i + 1), `<p class="small" style="margin-top:0">${l.t === 'dlg' ? `<b style="color:${charColor(p, l.s)}">${esc(l.s)}</b>: ` : ''}${fmtText(l.x).slice(0, 400)}</p>
-    <div class="acts"><button class="go" data-act="proveFrom" data-i="${i}">🎭 Prova da qui</button><button data-act="palcoAt" data-i="${i}">🎬 Palco qui</button><button data-act="editLine" data-i="${i}">✏ Modifica</button></div>
+    <div class="acts"><button class="go" data-act="proveFrom" data-i="${i}">🎧 Allenati da qui</button><button data-act="palcoAt" data-i="${i}">🎬 Palco qui</button><button data-act="editLine" data-i="${i}">✏ Modifica</button></div>
     <div class="acts"><button data-act="addLine" data-i="${i}">＋ Riga sotto</button><button data-act="addHead" data-i="${i}">＋ Nuova scena qui</button></div>`);
 }
 function editLineSheet(i, isNew) {
@@ -521,7 +641,7 @@ function renderCompagnia() {
       <div class="row" style="margin-top:8px"><label class="f" style="margin:0">Tono</label><input type="range" min="-5" max="5" step="1" value="${c.pitch || 0}" data-chg="charPitch" data-n="${esc(c.n)}" style="flex:1"><button data-act="testVoice" data-n="${esc(c.n)}">▶ Prova</button></div>
     </div>`;
   }).join('');
-  return `<h2 class="sec">PERSONAGGI E VOCI</h2>
+  return `<h2 class="sec" style="margin-top:4px">PERSONAGGI E VOCI</h2>
     <p class="small muted" style="margin-top:0">Segna con ★ i tuoi personaggi. Ogni personaggio può avere una voce e un tono diversi per il partner vocale (le voci disponibili dipendono dal dispositivo). L'altezza serve per la vista dal pubblico.</p>
     ${rows || '<p class="muted">Nessun personaggio: importa un copione o aggiungine uno.</p>'}
     <div class="row"><button data-act="addChar">＋ Personaggio</button></div>
@@ -612,7 +732,7 @@ async function importProjectFile() {
       else S.projects = S.projects.filter(x => x.id !== p.id);
     }
     for (const [k, a] of Object.entries(j.audio || {})) await DB.put('audio', b64ToBlob(a.data, a.type), p.id + ':' + k);
-    S.projects.unshift(p); S.p = p; await saveNow(); openProject(p.id, myNames(p).length ? 'prove' : 'compagnia');
+    S.projects.unshift(p); S.p = p; await saveNow(); openProject(p.id, 'ascolta'); if (!myNames(p).length) setTimeout(() => App.roleSheet(), 300);
     toast('Progetto importato ✓' + (myNames(p).length ? '' : ' — scegli il tuo personaggio'));
   } catch (e) { toast('Importazione non riuscita: ' + e.message, 4000); }
 }
@@ -621,7 +741,7 @@ async function replaceScript(lines) {
   if (p.lines.length && !confirm('Sostituire il copione attuale? Movimenti e progressi legati alle vecchie righe andranno persi.')) return;
   p.lines = lines; p.blk = Object.fromEntries(Object.entries(p.blk).filter(([k]) => k === '_base')); p.prog = {};
   ensureChars(p); touch(); const sm = scriptSummary(lines);
-  toast(`Copione: ${sm.dlg} battute, ${sm.chars.length} personaggi`); S.tab = myNames(p).length ? 'copione' : 'compagnia'; render();
+  toast(`Copione: ${sm.dlg} battute, ${sm.chars.length} personaggi`); S.tab = 'ascolta'; render(); if (!myNames(p).length) setTimeout(() => App.roleSheet(), 300);
 }
 
 /* ───────── eventi ───────── */
@@ -631,7 +751,7 @@ const ACT = {
     sheet('Novità', `<div class="cl">${CHANGELOG.map(c => `<article><h4>${c.v} <span class="muted small">· ${c.d}</span></h4><div>${esc(c.t)}</div><ul>${c.items.map(i => `<li class="small">${esc(i)}</li>`).join('')}</ul></article>`).join('')}</div><p class="small muted">Schema versioni V.maior.minor.patch: maior = cambiamento grosso, minor = nuova funzione, patch = correzione.</p>`);
   },
   newProject() { Wizard.start(); },
-  async demo() { const p = demoProject(); S.projects.unshift(p); S.p = p; await saveNow(); openProject(p.id, 'palco'); toast('Demo creata: tu sei NINO'); },
+  async demo() { const p = demoProject(); S.projects.unshift(p); S.p = p; await saveNow(); openProject(p.id, 'ascolta'); toast('Demo creata: tu sei NINO'); },
   importProject: importProjectFile,
   open(el) { openProject(el.dataset.id); },
   tab(el, e) { e.preventDefault(); Stage.stopPlay && Stage.stopPlay(); S.tab = el.dataset.k; renderTab(); window.scrollTo(0, 0); },
@@ -661,16 +781,24 @@ const ACT = {
   proveFrom(el) { closeSheet(); Prove.quickFrom(+el.dataset.i); },
   palcoAt(el) { closeSheet(); Stage.goto(+el.dataset.i); S.tab = 'palco'; renderTab(); },
   async importScript() {
-    const f = await pickFile('.docx,.pdf,.txt,.html,.htm,text/plain'); if (!f) return;
-    try { toast('Leggo il copione…'); const lines = parseParagraphs(await fileToParas(f)); if (!lines.length) throw new Error('nessuna riga trovata'); await replaceScript(lines); }
-    catch (e) { toast('Non riesco a leggere il file: ' + e.message, 4000); }
+    const fs = await pickFiles('.docx,.pdf,.txt,.html,.htm,text/plain,image/*', { multiple: true }); if (!fs.length) return;
+    try { busy('Leggo il copione…'); const lines = parseParagraphs(await filesToParas(fs)); busy(null); if (!lines.length) throw new Error('nessuna riga trovata'); await replaceScript(lines); }
+    catch (e) { busy(null); toast('Non riesco a leggere il file: ' + e.message, 4000); }
   },
+  quickStart() { Quick.start(); },
+  roleSheet() { App.roleSheet(); },
+  roleTog(el) { const c = getChar(S.p, el.dataset.n); c.mine = !c.mine; el.setAttribute('aria-pressed', c.mine); touch(); renderTab(); },
   pasteScript() {
     sheet('Incolla il copione', `<textarea id="pasteTx" rows="12" placeholder="SCENA 1&#10;MARIO: Buongiorno!&#10;(Entra Lucia)&#10;LUCIA: Buongiorno a te."></textarea><div class="acts"><button class="go" data-act="pasteGo">Usa questo testo</button></div>`, el => $('#pasteTx', el).focus());
   },
   pasteGo() { const t = $('#pasteTx').value.trim(); if (!t) return; closeSheet(); replaceScript(parseParagraphs(textToParas(t))); },
   exportTxt() { const p = S.p; download(slug(p.title) + '.txt', p.lines.map(l => l.t === 'head' ? '\n' + l.x.toUpperCase() : l.t === 'dlg' ? `${l.s}: ${l.x}` : `(${l.x})`).join('\n'), 'text/plain'); },
   mine(el) { const c = getChar(S.p, el.dataset.n); c.mine = !c.mine; touch(); renderTab(); },
+  qPick() { Quick.pick(); }, qPhoto() { Quick.photo(); }, qPaste() { S.q.paste = true; render(); setTimeout(() => $('#qTx') && $('#qTx').focus(), 50); },
+  qPasteGo() { const t = $('#qTx').value.trim(); if (!t) return; S.q.lines = parseParagraphs(textToParas(t)); S.q.title = S.q.title || 'Il mio copione'; S.q.step = 1; render(); },
+  qMine(el) { const q = S.q; const n = el.dataset.n; q.mine = q.mine.includes(n) ? q.mine.filter(x => x !== n) : [...q.mine, n]; el.setAttribute('aria-pressed', q.mine.includes(n)); },
+  qBack() { if (S.q.step) { S.q = { step: 0, lines: [], mine: [], title: '' }; render(); } else { S.view = 'home'; render(); } },
+  qGo() { Quick.finish(); },
   charMenu(el) {
     const n = el.dataset.n;
     sheet(esc(n), `<div class="fld"><label class="f">Rinomina (se scrivi il nome di un altro personaggio, i due vengono uniti)</label><input id="cmName" value="${esc(n)}"></div>
@@ -744,7 +872,7 @@ const TTS = {
   init() {
     if (!('speechSynthesis' in window)) return;
     const load = () => { this.voices = speechSynthesis.getVoices(); };
-    load(); speechSynthesis.onvoiceschanged = () => { load(); if (S.view === 'project' && S.tab === 'compagnia') renderTab(); };
+    load(); speechSynthesis.onvoiceschanged = () => { load(); if (S.view === 'project' && S.tab === 'altro') renderTab(); };
   },
   voiceOptions() {
     const it = this.voices.filter(v => /^it/i.test(v.lang)); const rest = this.voices.filter(v => !/^it/i.test(v.lang));

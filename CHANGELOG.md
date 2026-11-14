@@ -7,6 +7,20 @@ Schema: **V.maior.minor.patch**
 
 La versione è visibile nell'app (in alto, accanto al logo) e cliccandola si vedono le novità.
 
+## V2.1.0 — 14/11/2026
+Prima l'attore: copione → ruolo → ascolta.
+- Nuovo percorso **«Impara una parte»** in 2 passi: carichi il copione, tocchi il tuo ruolo, ascolti. Il palco diventa facoltativo (resta il primo passo dei «Progetti di regia»).
+- Nuova scheda **Ascolta**, la prima:
+  - **Tutto, anche le mie battute** — come una canzone, le tue ripetute 1, 2 o 3 volte;
+  - **Allenamento** — gli altri parlano; al tuo turno pausa della durata giusta, attesa di un tocco o microfono che controlla parola per parola. Aiuto a scalare: senti tutta la battuta e la ripeti → solo metà → solo la prima parola → silenzio. Bip quando tocca a te, «fammela sentire giusta», «salta le battute lontane»;
+  - **Solo le mie battute** — di fila, con la battuta d'attacco (ultima frase) prima.
+  - Ricomincia da capo, velocità, didascalie, «Dove sono» sul palco.
+- La pausa dura quanto la tua battuta registrata; l'aiuto parziale taglia la registrazione al punto giusto.
+- **Scarica l'audio** (WAV) costruito dalle registrazioni: da ascoltare in auto o a schermo spento.
+- Import più facile: **PDF scansionati e foto delle pagine** con riconoscimento del testo (italiano), **condivisione diretta** da WhatsApp/mail/file verso l'app installata, controllo dei personaggi riconosciuti prima di partire.
+- Il tuo ruolo è sempre in vista sotto il titolo e si cambia con un tocco.
+- Schede riordinate: Ascolta · Prove · Copione · Palco · Altro (personaggi e voci in Altro).
+
 ## V2.0.0 — 13/11/2026
 Rinascita in stile GPverse: da planner di planimetrie ad app completa per **imparare la parte** e **disegnare il palco**.
 

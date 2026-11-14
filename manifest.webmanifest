@@ -1,7 +1,7 @@
 {
   "name": "GPverse StagePlanner",
   "short_name": "StagePlanner",
-  "description": "Impara la parte e disegna il palco: copione, prove con partner vocale, scenografia e movimenti in pianta e dal pubblico.",
+  "description": "Impara la parte: carica il copione, scegli il ruolo e ascolta. Prove con partner vocale, palco e scenografia in pianta e dal pubblico.",
   "lang": "it",
   "start_url": "./index.html",
   "scope": "./",
@@ -10,7 +10,39 @@
   "background_color": "#04060b",
   "theme_color": "#04060b",
   "icons": [
-    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "share_target": {
+    "action": "./share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "files": [
+        {
+          "name": "file",
+          "accept": [
+            "application/pdf",
+            ".pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".docx",
+            "text/plain",
+            ".txt",
+            "image/*"
+          ]
+        }
+      ]
+    }
+  }
 }

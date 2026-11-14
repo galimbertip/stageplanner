@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#04060b">
-<meta name="description" content="GPverse StagePlanner: impara la parte, prova con il partner vocale e disegna palco, scenografia e movimenti, vista dall'alto e dal pubblico.">
+<meta name="description" content="GPverse StagePlanner: carica il copione, scegli il tuo ruolo e impara la parte ascoltando; prove con partner vocale; palco e scenografia vista dall'alto e dal pubblico.">
 <title>GPverse StagePlanner</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon-192.png">
@@ -203,6 +203,28 @@ h3{margin:0 0 6px;font:700 15px var(--f-display);letter-spacing:.08em;color:var(
 .rec-list .ln{cursor:default}
 .recbtn.on{background:var(--rec);color:#fff;border-color:var(--rec)}
 .foot{margin-top:24px;color:var(--faint);font-size:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+/* attore: avvio rapido, ruolo, ascolto */
+.starts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:640px){.starts{grid-template-columns:1fr}}
+.start{text-align:left;display:flex;gap:14px;align-items:flex-start;padding:18px}
+.start .ic{font-size:34px;line-height:1}
+.start b{display:block;font:700 16px var(--f-display);letter-spacing:.06em;color:var(--cyan);margin-bottom:4px}
+.start small{color:var(--dim);font-size:13.5px}
+.rolebar{width:100%;display:flex;align-items:center;gap:8px;margin:-4px 0 14px;padding:10px 14px;text-align:left;border-radius:12px;background:linear-gradient(90deg,rgba(58,232,255,.08),rgba(141,123,255,.06));border-color:var(--line2)}
+.lmodes{display:grid;gap:10px}
+.lmode{cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.lmode.on{border-color:var(--cyan-d);box-shadow:var(--glow)}
+.lhead{display:flex;gap:12px;align-items:flex-start}
+.lhead .ic{font-size:26px;line-height:1}
+.lhead b{display:block;font:700 13px var(--f-display);letter-spacing:.07em;color:var(--cyan);margin-bottom:3px}
+.lmode .radio{font-size:18px;color:var(--cyan)}
+.lx{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);cursor:default}
+.bigplay{display:block;width:100%;max-width:520px;margin:18px auto 0;padding:18px;font:900 18px var(--f-display);letter-spacing:.2em}
+.busy{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px}
+.busy .card{display:flex;gap:14px;align-items:center;max-width:420px}
+.spin{width:26px;height:26px;border-radius:50%;border:3px solid var(--line2);border-top-color:var(--cyan);animation:spin 1s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+details summary{cursor:pointer}
 </style>
 </head>
 <body>
